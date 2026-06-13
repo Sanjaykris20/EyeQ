@@ -12,7 +12,8 @@ import {
   TrendingUp, 
   Sparkles, 
   ArrowRight,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -44,6 +45,21 @@ export default function LandingPage() {
     { title: "Doctor Dashboard", desc: "Enables case management, status tracking (approve/reject), and custom clinical logs.", icon: ShieldCheck },
     { title: "PDF Reports", desc: "Compiles formatted patient screening records ready for signature, sharing, and archiving.", icon: FileText },
     { title: "Patient Monitoring", desc: "Tracks patient screening runs over time to compare historical scans side-by-side.", icon: TrendingUp }
+  ];
+
+  const symptoms = [
+    { name: "Blurred or Cloudy Vision", desc: "General loss of sharpness, haze, or focus issues. (Common in Cataract, Diabetic Retinopathy, DME)" },
+    { name: "Floaters & Flashes", desc: "Spots, cobwebs, or sudden flashes of light in your field of vision. (Common in Pathological Myopia, DR)" },
+    { name: "Distorted or Wavy Vision", desc: "Straight lines appear wavy, bent, or distorted. (Common in Macular Degeneration, DME, CSR)" },
+    { name: "Loss of Peripheral Vision", desc: "Narrowing of the visual field or 'tunnel vision' from the sides. (Common in Glaucoma)" },
+    { name: "Central Vision Loss", desc: "Dark or blurry spots appearing directly in the center of your vision. (Common in AMD, CSR)" },
+    { name: "Severe Headaches", desc: "Throbbing pain sometimes accompanied by nausea or ringing ears. (Common in Papilledema, HR)" },
+    { name: "Poor Night Vision", desc: "Difficulty seeing in low light or driving at night. (Common in Cataract, Myopia)" },
+    { name: "Halos Around Lights", desc: "Bright circles or rings appearing around light sources. (Common in Glaucoma, Cataract)" },
+    { name: "Sudden Vision Loss", desc: "Rapid, often painless decline or loss of vision in one or both eyes. (Common in Retinal Vein Occlusion, DR)" },
+    { name: "Faded Colors", desc: "Colors appearing washed out or less vibrant than usual. (Common in Cataract, DME)" },
+    { name: "Temporary Vision Blackouts", desc: "Brief episodes of vision loss or graying out lasting a few seconds. (Common in Papilledema)" },
+    { name: "Difficulty with Distant Objects", desc: "Struggling to focus on objects far away. (Common in Pathological Myopia)" },
   ];
 
   return (
@@ -130,6 +146,38 @@ export default function LandingPage() {
               >
                 View Admin Demo
               </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Symptoms Section */}
+        <section className="py-20 bg-slate-900/30 border-b border-border">
+          <div className="max-w-6xl mx-auto px-6">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl font-bold text-white">Common Warning Symptoms</h2>
+              <p className="text-muted-foreground mt-3 max-w-xl mx-auto">
+                If you experience any of these symptoms, we highly recommend proceeding to the screening immediately.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {symptoms.map((s, idx) => (
+                <div key={idx} className="p-6 rounded-xl bg-card border border-border hover:border-primary/40 transition-all flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                    <AlertCircle size={20} className="text-secondary" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white mb-2">{s.name}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-12 text-center">
+              <Link href="/login" className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-primary hover:bg-primary/95 text-white font-bold shadow-lg glow-blue transition-all">
+                Proceed to Screening <ArrowRight size={20} />
+              </Link>
             </div>
           </div>
         </section>

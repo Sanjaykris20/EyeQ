@@ -16,8 +16,25 @@ function WizardContent() {
   const router = useRouter();
   const { user, loading, getToken } = useAuth();
   
+  const SYMPTOM_LABELS: Record<string, string> = {
+    blurred_vision: "Blurred Vision", sudden_vision_loss: "Sudden Vision Loss", floaters: "Floaters",
+    distorted_vision: "Distorted/Wavy Vision", difficulty_distant: "Difficulty seeing distant", 
+    loss_side_vision: "Loss of side vision", double_vision: "Double Vision", eye_pain: "Eye Pain", 
+    light_sensitivity: "Light Sensitivity", night_vision_difficulty: "Night Vision Difficulty",
+    severe_headache: "Severe Headache", vision_blackouts: "Temporary Vision Blackouts",
+    halos_around_lights: "Halos Around Lights", color_vision_faded: "Faded Color Vision",
+    central_vision_loss: "Central Vision Loss", photopsia_flashes: "Flashes of Light",
+    pulsatile_tinnitus: "Pulsatile Tinnitus"
+  };
+
+  const SYMPTOM_CATEGORIES: Record<string, string[]> = {
+    "👁️ Vision Quality": ["blurred_vision", "distorted_vision", "difficulty_distant", "central_vision_loss", "loss_side_vision", "color_vision_faded", "sudden_vision_loss", "night_vision_difficulty"],
+    "✨ Visual Artifacts": ["floaters", "photopsia_flashes", "halos_around_lights", "vision_blackouts", "double_vision"],
+    "🧠 Physical & Neurological": ["severe_headache", "eye_pain", "light_sensitivity", "pulsatile_tinnitus"]
+  };
+
   const [stage, setStage] = useState(1);
-  const totalStages = 3;
+  const totalStages = 2;
   const [error, setError] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisText, setAnalysisText] = useState("");
@@ -131,10 +148,7 @@ function WizardContent() {
       setScreeningId(data.screening_id);
       setTargetedData(data.targeted_data);
       
-      // Initialize states based on targeted data
-      const initSymptoms: Record<string, string> = {};
-      data.targeted_data.symptoms_to_ask.forEach((s: string) => { initSymptoms[s] = "No"; });
-      setSymptoms(initSymptoms);
+
 
       const initMeasurements: Record<string, string> = {};
       data.targeted_data.measurements_to_ask.forEach((m: string) => { initMeasurements[m] = ""; });
@@ -188,22 +202,7 @@ function WizardContent() {
     }
   };
 
-  const SYMPTOM_LABELS: Record<string, string> = {
-    blurred_vision: "Blurred Vision", sudden_vision_loss: "Sudden Vision Loss", floaters: "Floaters",
-    distorted_vision: "Distorted/Wavy Vision", difficulty_distant: "Difficulty seeing distant", 
-    loss_side_vision: "Loss of side vision", double_vision: "Double Vision", eye_pain: "Eye Pain", 
-    light_sensitivity: "Light Sensitivity", night_vision_difficulty: "Night Vision Difficulty",
-    severe_headache: "Severe Headache", vision_blackouts: "Temporary Vision Blackouts",
-    halos_around_lights: "Halos Around Lights", color_vision_faded: "Faded Color Vision",
-    central_vision_loss: "Central Vision Loss", photopsia_flashes: "Flashes of Light",
-    pulsatile_tinnitus: "Pulsatile Tinnitus"
-  };
 
-  const SYMPTOM_CATEGORIES: Record<string, string[]> = {
-    "👁️ Vision Quality": ["blurred_vision", "distorted_vision", "difficulty_distant", "central_vision_loss", "loss_side_vision", "color_vision_faded", "sudden_vision_loss", "night_vision_difficulty"],
-    "✨ Visual Artifacts": ["floaters", "photopsia_flashes", "halos_around_lights", "vision_blackouts", "double_vision"],
-    "🧠 Physical & Neurological": ["severe_headache", "eye_pain", "light_sensitivity", "pulsatile_tinnitus"]
-  };
 
   const MEASUREMENT_LABELS: Record<string, string> = {
     hba1c: "HbA1c Level (%)", fasting_blood_sugar: "Fasting Blood Sugar (mg/dL)",
@@ -248,9 +247,8 @@ function WizardContent() {
             {/* Stepper Progress */}
             <div className="flex items-center justify-center mb-8 pb-4">
               {[
-                { num: 1, title: "Image Upload", icon: Camera },
-                { num: 2, title: "Targeted Symptoms", icon: Eye },
-                { num: 3, title: "Lab Reports", icon: Stethoscope }
+                { num: 1, title: "Intake & Image", icon: Camera },
+                { num: 2, title: "Lab Reports", icon: Stethoscope }
               ].map((s, i, arr) => {
                 const Icon = s.icon;
                 const isActive = stage === s.num;
@@ -288,7 +286,7 @@ function WizardContent() {
                 {stage === 1 && (
                   <motion.div key="stage1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
                     <div>
-                      <h3 className="text-xl font-bold text-white border-b border-border pb-3 mb-6">Patient Demographics</h3>
+                      <h3 className="text-xl font-bold text-white border-b border-border pb-3 mb-6 flex items-center gap-2"><User className="text-secondary"/> Patient Demographics</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-xs font-mono text-slate-400 mb-2 uppercase">Full Name *</label>
@@ -310,7 +308,47 @@ function WizardContent() {
                     </div>
 
                     <div>
-                      <h3 className="text-xl font-bold text-white border-b border-border pb-3 mb-6">Fundus Pre-Screening</h3>
+                      <h3 className="text-xl font-bold text-white border-b border-border pb-3 mb-6 flex items-center gap-2"><Stethoscope className="text-secondary"/> Patient Symptoms</h3>
+                      <div className="space-y-8">
+                        {Object.entries(SYMPTOM_CATEGORIES).map(([categoryName, categorySymptoms]) => (
+                          <div key={categoryName}>
+                            <h4 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">{categoryName}</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {categorySymptoms.map((symp: string) => {
+                                const isYes = symptoms[symp] === 'Yes';
+                                return (
+                                  <div 
+                                    key={symp}
+                                    onClick={() => updateNestedState(setSymptoms, symp, isYes ? 'No' : 'Yes')}
+                                    className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${isYes ? 'bg-primary/20 border-primary text-white shadow-[0_0_15px_rgba(56,189,248,0.2)]' : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'}`}
+                                  >
+                                    <span className="font-medium text-sm">{SYMPTOM_LABELS[symp] || symp}</span>
+                                    <div className={`w-5 h-5 rounded flex items-center justify-center border ${isYes ? 'bg-primary border-primary' : 'border-slate-600'}`}>
+                                      {isYes && <CheckCircle2 size={14} className="text-black" />}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-8 p-6 bg-slate-900/50 border border-slate-800 rounded-xl">
+                        <label className="block text-sm font-bold text-white mb-2">Message / Notes for Doctor</label>
+                        <p className="text-xs text-slate-400 mb-4">Are there any other symptoms or context the patient wants to add?</p>
+                        <textarea 
+                          value={patientNotes}
+                          onChange={(e) => setPatientNotes(e.target.value)}
+                          rows={3}
+                          className="w-full px-4 py-3 rounded-lg bg-slate-950 border border-border text-white focus:border-primary outline-none resize-none transition-all"
+                          placeholder="Type additional notes here..."
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-xl font-bold text-white border-b border-border pb-3 mb-6 flex items-center gap-2"><Camera className="text-secondary"/> Fundus Pre-Screening</h3>
                       <div 
                         onClick={() => fileInputRef.current?.click()}
                         className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center ${
@@ -337,9 +375,9 @@ function WizardContent() {
                       </div>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex justify-end pt-4">
                       <button onClick={handlePreScreen} disabled={!file || !demographics.name || !demographics.age} className="flex items-center gap-2 px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20 transition-all disabled:opacity-50">
-                        Run Image Pre-Screening <ChevronRight size={18} />
+                        Run Pre-Screening <ChevronRight size={18} />
                       </button>
                     </div>
                   </motion.div>
@@ -348,75 +386,7 @@ function WizardContent() {
                 {stage === 2 && targetedData && (
                   <motion.div key="stage2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                     <h3 className="text-xl font-bold text-white border-b border-border pb-3 flex items-center gap-2">
-                      <Sparkles className="text-secondary" /> Stage 2: Targeted Symptoms
-                    </h3>
-                    
-                    {targetedData.symptoms_to_ask.length === 0 ? (
-                      <div className="p-8 text-center text-slate-400">
-                        <CheckCircle2 size={48} className="text-green-500 mx-auto mb-4" />
-                        <p>The AI detected low immediate risk markers. No targeted symptom screening is required.</p>
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-sm text-slate-400 mb-6 border-l-2 border-primary pl-3">
-                          Based on the fundus scan, the AI has flagged potential anomalies. Please confirm if the patient has experienced any of these specific symptoms:
-                        </p>
-                        <div className="space-y-8">
-                          {Object.entries(SYMPTOM_CATEGORIES).map(([categoryName, categorySymptoms]) => {
-                            const activeSymptoms = targetedData.symptoms_to_ask.filter((s: string) => categorySymptoms.includes(s));
-                            if (activeSymptoms.length === 0) return null;
-
-                            return (
-                              <div key={categoryName}>
-                                <h4 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">{categoryName}</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {activeSymptoms.map((symp: string) => {
-                                    const isYes = symptoms[symp] === 'Yes';
-                                    return (
-                                      <div 
-                                        key={symp}
-                                        onClick={() => updateNestedState(setSymptoms, symp, isYes ? 'No' : 'Yes')}
-                                        className={`p-5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${isYes ? 'bg-primary/20 border-primary text-white shadow-[0_0_15px_rgba(56,189,248,0.2)]' : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'}`}
-                                      >
-                                        <span className="font-medium text-lg">{SYMPTOM_LABELS[symp] || symp}</span>
-                                        <div className={`w-6 h-6 rounded flex items-center justify-center border ${isYes ? 'bg-primary border-primary' : 'border-slate-600'}`}>
-                                          {isYes && <CheckCircle2 size={16} className="text-black" />}
-                                        </div>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        
-                        <div className="mt-8 p-6 bg-slate-900/50 border border-slate-800 rounded-xl">
-                          <label className="block text-sm font-bold text-white mb-2">Message / Notes for Doctor</label>
-                          <p className="text-xs text-slate-400 mb-4">Are there any other symptoms or context the patient wants to add?</p>
-                          <textarea 
-                            value={patientNotes}
-                            onChange={(e) => setPatientNotes(e.target.value)}
-                            rows={3}
-                            className="w-full px-4 py-3 rounded-lg bg-slate-950 border border-border text-white focus:border-primary outline-none resize-none transition-all"
-                            placeholder="Type additional notes here..."
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    <div className="flex justify-end mt-8 pt-4 border-t border-border">
-                      <button onClick={() => setStage(3)} className="flex items-center gap-2 px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold transition-all">
-                        Proceed to Lab Verification <ChevronRight size={18} />
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-
-                {stage === 3 && targetedData && (
-                  <motion.div key="stage3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-                    <h3 className="text-xl font-bold text-white border-b border-border pb-3 flex items-center gap-2">
-                      <Stethoscope className="text-secondary" /> Stage 3: Lab Reports
+                      <Stethoscope className="text-secondary" /> Stage 2: Targeted Lab Reports
                     </h3>
 
                     {targetedData.measurements_to_ask.length === 0 ? (
@@ -428,7 +398,7 @@ function WizardContent() {
                       <>
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-900/50 p-4 rounded-xl border border-slate-800 mb-6 gap-4">
                           <p className="text-sm text-slate-400">
-                            To reach 100% diagnostic certainty, the AI requires the following lab values.
+                            Based on the upfront symptoms and the AI scan, we need the following lab values.
                           </p>
                           <label className="flex items-center gap-2 cursor-pointer bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 transition-all shrink-0">
                             <input
@@ -462,7 +432,7 @@ function WizardContent() {
                     )}
 
                     <div className="flex justify-between items-center mt-8 pt-4 border-t border-border">
-                      <button onClick={() => setStage(2)} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium transition-all">
+                      <button onClick={() => setStage(1)} className="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium transition-all">
                         <ChevronLeft size={18} /> Back
                       </button>
                       <button onClick={handleFinalize} className="flex items-center gap-2 px-8 py-3 rounded-xl bg-secondary hover:bg-secondary/90 text-white font-bold shadow-lg shadow-secondary/30 transition-all">
@@ -471,6 +441,7 @@ function WizardContent() {
                     </div>
                   </motion.div>
                 )}
+
               </AnimatePresence>
             </div>
           </div>
