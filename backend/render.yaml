@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: eyeq-ai-backend
+    env: python
+    buildCommand: "./build.sh"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port 10000"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: DATABASE_URL
+        value: sqlite:///eyeq.db  # Use a cloud PostgreSQL URL here if you want persistent storage!
+      - key: BYPASS_FIREBASE_AUTH
+        value: "False"
+      - key: NEXT_PUBLIC_API_URL
+        value: "https://eyeq-ai-backend.onrender.com/api/v1"
+    disk:
+      name: eyeq-storage
+      mountPath: /opt/render/project/src/static
+      sizeGB: 5

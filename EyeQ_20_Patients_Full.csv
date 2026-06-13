@@ -1,0 +1,21 @@
+PatientID,Age,Gender,,Symptoms,History,ClinicalData,,RHI
+EYEQ101,45,Male,,Blurred Vision; Floaters,Diabetes 8 yrs,HbA1c 8.4%; FBS 170,,69
+EYEQ102,72,Female,,Wavy Vision; Reading Difficulty,Smoker,Lipids High,,58
+EYEQ103,38,Male,,Central Blur,Stress; Steroid Use,OCT Positive,,77
+EYEQ104,66,Female,,Side Vision Loss,Family History,IOP 27 mmHg,,54
+EYEQ105,51,Male,,Headache; Blur,Hypertension,BP 165/98,,63
+EYEQ106,24,Female,,Distance Vision Difficulty,High Myopia,-7.5D,,83
+EYEQ107,59,Male,,Blurred Vision,Diabetes,CBC Abnormal,,49
+EYEQ108,33,Female,,Headache; Nausea,None,MRI Positive,,41
+EYEQ109,57,Male,,Sudden Vision Loss,Vascular Disease,Doppler Positive,,37
+EYEQ110,48,Female,,Flashes; Curtain Shadow,Myopia,B-Scan Positive,,29
+EYEQ111,62,Male,,Blurred Vision,Diabetes 15 yrs,HbA1c 10.2%,,40
+EYEQ112,69,Female,,Distorted Vision,Smoker 30 yrs,OCT Positive,,61
+EYEQ113,29,Male,,Central Distortion,Stress,OCT Positive,,79
+EYEQ114,70,Male,,Peripheral Vision Loss,Family History,IOP 31 mmHg,,47
+EYEQ115,55,Female,,Headache,Hypertension,BP 180/110,,52
+EYEQ116,27,Male,,Distance Blur,High Myopia,-8.0D,,81
+EYEQ117,63,Female,,Vision Loss,Diabetes + HTN,CBC + Lipids,,46
+EYEQ118,31,Female,,Vomiting; Headache,None,MRI Positive,,38
+EYEQ119,61,Male,,Sudden Blind Spot,Hypertension,Carotid Plaque,,35
+EYEQ120,53,Female,,No Symptoms,None,Normal,,98

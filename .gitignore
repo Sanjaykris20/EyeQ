@@ -1,0 +1,53 @@
+# Node
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database
+eyeq.db
+backend/eyeq.db
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# AI Models & Data
+*.pth
+*.pt
+fold1_best.pth
+backend/fold1_best.pth
+data/
+backend/static/uploads/
+backend/static/reports/

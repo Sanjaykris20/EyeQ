@@ -1,0 +1,22 @@
+{
+  "hosting": {
+    "public": "frontend/out",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "rewrites": [
+      {
+        "source": "/analysis/:id",
+        "destination": "/analysis/baseline.html"
+      },
+      {
+        "source": "/analysis/:id/explain",
+        "destination": "/analysis/baseline/explain.html"
+      }
+    ]
+  }
+}
