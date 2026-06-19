@@ -38,6 +38,18 @@ function WizardContent() {
   const [error, setError] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisText, setAnalysisText] = useState("");
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [analysisStep, setAnalysisStep] = useState(0);
+
+  const ANALYSIS_STEPS = [
+    { label: "Saving fundus image securely...", icon: "📁", duration: 800 },
+    { label: "Enhancing image (CLAHE + sharpening)...", icon: "🔬", duration: 2000 },
+    { label: "Running ConvNeXt deep learning model...", icon: "🧠", duration: 8000 },
+    { label: "Calculating disease probabilities...", icon: "📊", duration: 1500 },
+    { label: "Computing Retinal Health Index (RHI)...", icon: "❤️", duration: 1000 },
+    { label: "Generating GradCAM heatmap (background)...", icon: "🗺️", duration: 500 },
+    { label: "Report ready! Redirecting...", icon: "✅", duration: 500 },
+  ];
 
   const [screeningId, setScreeningId] = useState<string | null>(null);
   const [targetedData, setTargetedData] = useState<{symptoms_to_ask: string[], measurements_to_ask: string[]} | null>(null);
@@ -61,7 +73,30 @@ function WizardContent() {
   const [skipMeasurements, setSkipMeasurements] = useState(false);
   const [patientNotes, setPatientNotes] = useState("");
 
+  const [patientMode, setPatientMode] = useState<"new" | "existing">("new");
+  const [patientsList, setPatientsList] = useState<any[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+  useEffect(() => {
+    if (patientMode === "existing" && user && !loading) {
+      const fetchPatients = async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/patients`, {
+            headers: { "Authorization": `Bearer ${getToken()}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setPatientsList(data);
+          }
+        } catch (err) {
+          console.error("Failed to load patients", err);
+        }
+      };
+      fetchPatients();
+    }
+  }, [patientMode, user, loading, getToken, API_BASE_URL]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -94,9 +129,16 @@ function WizardContent() {
   };
 
   const handlePreScreen = async () => {
-    if (!demographics.name || !demographics.age) {
-      setError("Name and Age are required fields.");
-      return;
+    if (patientMode === "new") {
+      if (!demographics.name || !demographics.age) {
+        setError("Name and Age are required fields.");
+        return;
+      }
+    } else {
+      if (!selectedPatientId) {
+        setError("Please select an existing patient.");
+        return;
+      }
     }
     if (!file) {
       setError("Please upload a fundus photograph scan.");
@@ -105,32 +147,56 @@ function WizardContent() {
 
     setError("");
     setAnalyzing(true);
-    setAnalysisText("Running deep learning model on fundus image...");
+    setAnalysisStep(0);
+    setAnalysisProgress(0);
+    setAnalysisText(ANALYSIS_STEPS[0].label);
+
+    // Animate progress steps in parallel with real work
+    let stepIdx = 0;
+    let totalDuration = ANALYSIS_STEPS.reduce((s, x) => s + x.duration, 0);
+    let elapsed = 0;
+    const advanceStep = (idx: number) => {
+      if (idx >= ANALYSIS_STEPS.length) return;
+      setAnalysisStep(idx);
+      setAnalysisText(ANALYSIS_STEPS[idx].label);
+      setAnalysisProgress(Math.round((elapsed / totalDuration) * 100));
+      const timer = setTimeout(() => {
+        elapsed += ANALYSIS_STEPS[idx].duration;
+        advanceStep(idx + 1);
+      }, ANALYSIS_STEPS[idx].duration);
+      return timer;
+    };
+    advanceStep(0);
 
     try {
       const token = getToken();
       
-      // 1. Create Patient
-      setAnalysisText("Registering patient demographics...");
-      const patientRes = await fetch(`${API_BASE_URL}/patients`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({
-          name: demographics.name, age: parseInt(demographics.age), gender: demographics.gender,
-          height: demographics.height ? parseFloat(demographics.height) : null,
-          weight: demographics.weight ? parseFloat(demographics.weight) : null,
-          occupation: demographics.occupation || null, location: demographics.location || null,
-          phone: demographics.phone || null, email: demographics.email || null
-        })
-      });
+      let pid = selectedPatientId;
+      
+      if (patientMode === "new") {
+        // 1. Create Patient
+        setAnalysisText("Registering patient demographics...");
+        const patientRes = await fetch(`${API_BASE_URL}/patients`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({
+            name: demographics.name, age: parseInt(demographics.age), gender: demographics.gender,
+            height: demographics.height ? parseFloat(demographics.height) : null,
+            weight: demographics.weight ? parseFloat(demographics.weight) : null,
+            occupation: demographics.occupation || null, location: demographics.location || null,
+            phone: demographics.phone || null, email: demographics.email || null
+          })
+        });
 
-      if (!patientRes.ok) throw new Error("Failed to register patient demographics.");
-      const patientData = await patientRes.json();
+        if (!patientRes.ok) throw new Error("Failed to register patient demographics.");
+        const patientData = await patientRes.json();
+        pid = patientData.id;
+      }
 
       // 2. Pre-Screen Image
       setAnalysisText("Analyzing retinal biomarkers...");
       const formData = new FormData();
-      formData.append("patient_id", patientData.id);
+      formData.append("patient_id", pid);
       formData.append("file", file);
 
       const res = await fetch(`${API_BASE_URL}/screenings/pre-screen`, {
@@ -225,11 +291,53 @@ function WizardContent() {
       <main className="flex-1 p-8 overflow-y-auto max-w-5xl mx-auto">
         {analyzing ? (
           <div className="min-h-[70vh] flex flex-col items-center justify-center text-center p-8">
-            <div className="w-24 h-24 rounded-full border-4 border-primary border-t-secondary animate-spin mb-8 shadow-lg glow-cyan" />
-            <h2 className="text-2xl font-bold text-white tracking-wide uppercase font-mono flex items-center gap-3">
-              <Activity className="text-secondary animate-pulse" size={24} /> 
-              {analysisText}
+            {/* Animated Eye Icon */}
+            <div className="relative w-28 h-28 mb-8">
+              <div className="absolute inset-0 rounded-full border-4 border-primary/30 animate-ping" />
+              <div className="absolute inset-2 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center text-4xl">
+                {ANALYSIS_STEPS[Math.min(analysisStep, ANALYSIS_STEPS.length - 1)]?.icon}
+              </div>
+            </div>
+
+            <h2 className="text-xl font-bold text-white mb-2 tracking-wide">
+              AI Retinal Analysis In Progress
             </h2>
+            <p className="text-sm text-slate-400 mb-8 max-w-sm">
+              {analysisText}
+            </p>
+
+            {/* Progress Bar */}
+            <div className="w-full max-w-md bg-slate-800 rounded-full h-2 mb-6 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-primary to-secondary rounded-full transition-all duration-500"
+                style={{ width: `${analysisProgress}%` }}
+              />
+            </div>
+
+            {/* Step Checklist */}
+            <div className="w-full max-w-md space-y-2 text-left">
+              {ANALYSIS_STEPS.slice(0, -1).map((step, i) => (
+                <div key={i} className={`flex items-center gap-3 text-sm transition-all duration-300 ${
+                  i < analysisStep ? 'text-green-400' :
+                  i === analysisStep ? 'text-white font-semibold' :
+                  'text-slate-600'
+                }`}>
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 border ${
+                    i < analysisStep ? 'bg-green-500/20 border-green-500 text-green-400' :
+                    i === analysisStep ? 'bg-primary/20 border-primary animate-pulse' :
+                    'border-slate-700 text-slate-700'
+                  }`}>
+                    {i < analysisStep ? '✓' : i + 1}
+                  </span>
+                  <span>{step.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs text-slate-600 mt-8">
+              This may take 10–30 seconds — your 353MB ConvNeXt model is running locally.
+            </p>
           </div>
         ) : (
           <div className="max-w-4xl mx-auto">
@@ -286,25 +394,74 @@ function WizardContent() {
                 {stage === 1 && (
                   <motion.div key="stage1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
                     <div>
-                      <h3 className="text-xl font-bold text-white border-b border-border pb-3 mb-6 flex items-center gap-2"><User className="text-secondary"/> Patient Demographics</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-xs font-mono text-slate-400 mb-2 uppercase">Full Name *</label>
-                          <input type="text" value={demographics.name} onChange={e => updateNestedState(setDemographics, 'name', e.target.value)} className="w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-border text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Patient Name" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-mono text-slate-400 mb-2 uppercase">Age *</label>
-                            <input type="number" value={demographics.age} onChange={e => updateNestedState(setDemographics, 'age', e.target.value)} className="w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-border text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="Years" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-mono text-slate-400 mb-2 uppercase">Gender</label>
-                            <select value={demographics.gender} onChange={e => updateNestedState(setDemographics, 'gender', e.target.value)} className="w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-border text-white focus:border-primary outline-none">
-                              <option>Male</option><option>Female</option><option>Other</option>
-                            </select>
-                          </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 mb-6 gap-4">
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                          <User className="text-secondary"/> Patient Demographics
+                        </h3>
+                        <div className="flex bg-slate-900 rounded-lg p-1 border border-border shrink-0">
+                          <button 
+                            type="button"
+                            onClick={() => setPatientMode("new")}
+                            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${patientMode === "new" ? "bg-primary text-white shadow-sm" : "text-slate-400 hover:text-white"}`}
+                          >
+                            New Patient
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setPatientMode("existing")}
+                            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${patientMode === "existing" ? "bg-primary text-white shadow-sm" : "text-slate-400 hover:text-white"}`}
+                          >
+                            Existing Patient
+                          </button>
                         </div>
                       </div>
+
+                      {patientMode === "existing" ? (
+                        <div className="mb-6">
+                          <label className="block text-xs font-mono text-slate-400 mb-2 uppercase">Select Patient *</label>
+                          <select 
+                            value={selectedPatientId} 
+                            onChange={e => {
+                              const pid = e.target.value;
+                              setSelectedPatientId(pid);
+                              const selected = patientsList.find(p => p.id === pid);
+                              if (selected) {
+                                setDemographics({
+                                  ...demographics,
+                                  name: selected.name,
+                                  age: selected.age.toString(),
+                                  gender: selected.gender
+                                });
+                              }
+                            }} 
+                            className="w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-border text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                          >
+                            <option value="">-- Choose a patient --</option>
+                            {patientsList.map(p => (
+                              <option key={p.id} value={p.id}>{p.name} (Age: {p.age}, {p.gender})</option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                          <div>
+                            <label className="block text-xs font-mono text-slate-400 mb-2 uppercase">Full Name *</label>
+                            <input type="text" value={demographics.name} onChange={e => updateNestedState(setDemographics, 'name', e.target.value)} className="w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-border text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="Patient Name" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-mono text-slate-400 mb-2 uppercase">Age *</label>
+                              <input type="number" value={demographics.age} onChange={e => updateNestedState(setDemographics, 'age', e.target.value)} className="w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-border text-white focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="Years" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-mono text-slate-400 mb-2 uppercase">Gender</label>
+                              <select value={demographics.gender} onChange={e => updateNestedState(setDemographics, 'gender', e.target.value)} className="w-full px-4 py-2.5 rounded-lg bg-slate-950 border border-border text-white focus:border-primary outline-none">
+                                <option>Male</option><option>Female</option><option>Other</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -376,7 +533,7 @@ function WizardContent() {
                     </div>
 
                     <div className="flex justify-end pt-4">
-                      <button onClick={handlePreScreen} disabled={!file || !demographics.name || !demographics.age} className="flex items-center gap-2 px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20 transition-all disabled:opacity-50">
+                      <button onClick={handlePreScreen} disabled={!file || (patientMode === "new" ? (!demographics.name || !demographics.age) : !selectedPatientId)} className="flex items-center gap-2 px-8 py-3 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20 transition-all disabled:opacity-50">
                         Run Pre-Screening <ChevronRight size={18} />
                       </button>
                     </div>

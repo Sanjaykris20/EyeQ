@@ -92,7 +92,7 @@ class RetinalConvNeXt(nn.Module):
             nn.Linear(1024, 512),
             nn.GELU(), 
             nn.Dropout(0.2), 
-            nn.Linear(512, 10)
+            nn.Linear(512, 8)
         )
 
     def forward(self, x):
@@ -135,7 +135,7 @@ if os.path.exists(MODEL_WEIGHTS_PATH):
 else:
     print(f"Weights file not found at {MODEL_WEIGHTS_PATH}. Running with randomized weights fallback.")
 
-DISEASES = ["DR", "Glaucoma", "AMD", "Cataract", "Myopia", "HR", "DME", "Papilledema", "CSR", "RVO"]
+DISEASES = ["DR", "CSR", "AMD", "Myopia", "HR", "RAVO", "Papilledema", "RD"]
 
 # --- Preprocessor and GradCAM Pipelines ---
 
@@ -239,76 +239,140 @@ def generate_true_gradcam(model: nn.Module, img_tensor: torch.Tensor, class_idx:
 
     return heatmap
 
-def run_retinal_analysis(img_path: str, output_dir: str):
+def _get_dr_severity(dr_score: float) -> str:
+    if dr_score < 20.0:
+        return "No DR"
+    elif dr_score < 40.0:
+        return "Mild"
+    elif dr_score < 60.0:
+        return "Moderate"
+    elif dr_score < 80.0:
+        return "Severe"
+    else:
+        return "Proliferative"
+
+
+def run_retinal_analysis_fast(img_path: str, output_dir: str):
     """
-    Executes core pipeline:
-    1. Preprocesses image
-    2. Performs PyTorch model forward pass
-    3. Calculates RHI, disease percentages, and DR severity stage
-    4. Generates enhanced and GradCAM heatmap images, saving them to static folder
+    FAST path (no GradCAM):
+    1. Preprocesses image (CLAHE + sharpening)
+    2. Runs PyTorch forward pass only — returns in ~3-5s
+    3. Saves enhanced image; heatmap is generated separately via run_gradcam_and_update()
+
+    Returns tensors so the caller can pass them to run_gradcam_and_update.
     """
-    # Create filenames
     file_id = str(uuid.uuid4())
     enhanced_name = f"enhanced_{file_id}.png"
-    heatmap_name = f"heatmap_{file_id}.png"
-
     enhanced_path = os.path.join(output_dir, enhanced_name)
-    heatmap_path = os.path.join(output_dir, heatmap_name)
 
-    # 1. Preprocess
+    # Preprocess
     img_orig, img_enhanced, img_tensor = preprocess_image(img_path)
-
-    # Save enhanced image
     cv2.imwrite(enhanced_path, img_enhanced)
 
-    # 2. PyTorch model forward pass
+    # Forward pass (no gradient tracking needed here)
     with torch.no_grad():
         logits = model(img_tensor)
-        probs = torch.sigmoid(logits)[0] # Multi-label probabilities
+        probs = torch.sigmoid(logits)[0]
 
-    # Convert probability tensor to list of percentage floats
     prob_list = probs.tolist()
     results_dict = {}
-
-    # Format output disease probabilities
     for i, disease in enumerate(DISEASES):
         results_dict[disease] = round(float(prob_list[i]) * 100, 1)
 
-    # 3. Calculate Retinal Health Index (RHI)
+    # RHI calculation
     max_risk = max(results_dict.values()) / 100.0
     avg_risk = sum(results_dict.values()) / len(results_dict) / 100.0
-    
     rhi_raw = 100.0 - (max_risk * 65.0 + avg_risk * 35.0)
-    rhi_score = int(np.clip(rhi_raw, 5, 98)) # Bound RHI logically between 5 and 98
+    rhi_score = int(np.clip(rhi_raw, 5, 98))
 
-    # 4. Generate GradCAM heatmap (specifically using the disease with highest prediction)
+    severity_dr = _get_dr_severity(results_dict["DR"])
+
+    return {
+        "file_id": file_id,
+        "enhanced_filename": enhanced_name,
+        "disease_scores": results_dict,
+        "rhi": rhi_score,
+        "severity_dr": severity_dr,
+        # Pass tensors forward so background task can reuse them without re-running
+        "img_tensor": img_tensor,
+        "img_orig": img_orig,
+    }
+
+
+def run_gradcam_and_update(
+    raw_path: str,
+    img_tensor,
+    img_orig,
+    ai_scores: dict,
+    heatmap_path: str,
+    screening_id: str,
+):
+    """
+    BACKGROUND TASK: runs GradCAM backward pass and saves the heatmap overlay.
+    Called after the API response has already been sent — does not block the user.
+    """
+    try:
+        probs_np = np.array([ai_scores[d] / 100.0 for d in DISEASES])
+        max_idx = int(np.argmax(probs_np))
+
+        try:
+            heatmap = generate_true_gradcam(model, img_tensor, max_idx, img_orig.shape)
+        except Exception as e:
+            print(f"[BG GradCAM] Backprop failed: {e}. Using fallback overlay.")
+            heatmap = np.zeros(img_orig.shape, dtype=np.uint8)
+            cx, cy = img_orig.shape[1] // 2, img_orig.shape[0] // 2
+            radius = int(img_orig.shape[0] * 0.2)
+            cv2.circle(heatmap, (cx, cy), radius, (0, 0, 255), -1)
+            heatmap = cv2.GaussianBlur(heatmap, (95, 95), 0)
+
+        overlay = cv2.addWeighted(img_orig, 0.6, heatmap, 0.4, 0)
+        cv2.imwrite(heatmap_path, overlay)
+        print(f"[BG GradCAM] Heatmap saved for screening {screening_id} → {heatmap_path}")
+    except Exception as e:
+        print(f"[BG GradCAM] Failed for screening {screening_id}: {e}")
+
+
+def run_retinal_analysis(img_path: str, output_dir: str):
+    """
+    ORIGINAL (blocking) pipeline — kept for backwards compatibility.
+    Prefer run_retinal_analysis_fast + run_gradcam_and_update for new code.
+    """
+    file_id = str(uuid.uuid4())
+    enhanced_name = f"enhanced_{file_id}.png"
+    heatmap_name = f"heatmap_{file_id}.png"
+    enhanced_path = os.path.join(output_dir, enhanced_name)
+    heatmap_path = os.path.join(output_dir, heatmap_name)
+
+    img_orig, img_enhanced, img_tensor = preprocess_image(img_path)
+    cv2.imwrite(enhanced_path, img_enhanced)
+
+    with torch.no_grad():
+        logits = model(img_tensor)
+        probs = torch.sigmoid(logits)[0]
+
+    prob_list = probs.tolist()
+    results_dict = {}
+    for i, disease in enumerate(DISEASES):
+        results_dict[disease] = round(float(prob_list[i]) * 100, 1)
+
+    max_risk = max(results_dict.values()) / 100.0
+    avg_risk = sum(results_dict.values()) / len(results_dict) / 100.0
+    rhi_raw = 100.0 - (max_risk * 65.0 + avg_risk * 35.0)
+    rhi_score = int(np.clip(rhi_raw, 5, 98))
+
     max_idx = int(probs.argmax().item())
-    
     try:
         heatmap = generate_true_gradcam(model, img_tensor, max_idx, img_orig.shape)
     except Exception as e:
-        # Fallback to simple simulated heatmap if backprop fails (e.g. edge shape mismatch)
         print(f"True GradCAM backprop skipped/failed: {e}. Falling back to default overlay.")
         heatmap = np.zeros(img_orig.shape, dtype=np.uint8)
         cv2.circle(heatmap, (img_orig.shape[1]//2, img_orig.shape[0]//2), int(img_orig.shape[0]*0.2), (0, 0, 255), -1)
         heatmap = cv2.GaussianBlur(heatmap, (95, 95), 0)
 
-    # Overlay heatmap onto original image (alpha blend)
     overlay = cv2.addWeighted(img_orig, 0.6, heatmap, 0.4, 0)
     cv2.imwrite(heatmap_path, overlay)
 
-    # 5. Determine Diabetic Retinopathy (DR) Severity
-    dr_prob = results_dict["DR"] / 100.0
-    if dr_prob < 0.2:
-        severity_dr = "No DR"
-    elif dr_prob < 0.4:
-        severity_dr = "Mild"
-    elif dr_prob < 0.6:
-        severity_dr = "Moderate"
-    elif dr_prob < 0.8:
-        severity_dr = "Severe"
-    else:
-        severity_dr = "Proliferative"
+    severity_dr = _get_dr_severity(results_dict["DR"])
 
     return {
         "enhanced_filename": enhanced_name,
@@ -317,3 +381,4 @@ def run_retinal_analysis(img_path: str, output_dir: str):
         "rhi": rhi_score,
         "severity_dr": severity_dr
     }
+

@@ -34,28 +34,35 @@ interface ScreeningDetails {
   symptoms: any;
   measurements: any;
   results: {
-    dr: number; g: number; amd: number; c: number; m: number;
-    hr: number; dme: number; p: number; csr: number; rvo: number;
-    clinical_dr: number; clinical_g: number; clinical_amd: number;
-    clinical_c: number; clinical_m: number; clinical_hr: number;
-    clinical_dme: number; clinical_p: number; clinical_csr: number;
-    clinical_rvo: number;
+    dr: number; csr: number; amd: number; m: number;
+    hr: number; ravo: number; p: number; rd: number;
+    clinical_dr: number; clinical_csr: number; clinical_amd: number;
+    clinical_m: number; clinical_hr: number;
+    clinical_ravo: number; clinical_p: number; clinical_rd: number;
     recommended_tests: string[];
     rhi: number;
   };
+  previous_screening?: {
+    id: string;
+    severity_dr: string;
+    created_at: string;
+    results: {
+      dr: number; csr: number; amd: number; m: number;
+      hr: number; ravo: number; p: number; rd: number;
+      rhi: number;
+    }
+  } | null;
 }
 
 const confirmationTestsMapping: Record<string, string[]> = {
   dr: ["OCT Scan", "HbA1c Test", "Dilated Fundus Examination"],
-  g: ["Tonometry", "OCT Scan", "Visual Field Test"],
+  csr: ["OCT Scan", "Fluorescein Angiography"],
   amd: ["OCT Scan", "Fluorescein Angiography", "Lipid Profile"],
-  c: ["Slit-Lamp Examination", "Visual Acuity Test"],
   m: ["Refraction Test", "Axial Length Measurement"],
   hr: ["Blood Pressure Measurement", "Fundus Examination"],
-  dme: ["OCT Scan"],
+  ravo: ["OCT Scan", "Fluorescein Angiography", "Carotid Doppler"],
   p: ["MRI Brain", "Lumbar Puncture", "Neurological Evaluation"],
-  csr: ["OCT Scan"],
-  rvo: ["OCT Scan", "Fluorescein Angiography", "Blood Pressure", "CBC", "Lipid Profile"]
+  rd: ["Dilated Fundus Examination", "Ultrasound", "OCT Scan"]
 };
 
 const getConfidenceLabel = (key: string, clinScore: number) => {
@@ -149,15 +156,13 @@ export default function AnalysisClient() {
 
   const diseaseMap = [
     { key: 'dr', name: "Diabetic Retinopathy" },
-    { key: 'g', name: "Glaucoma" },
+    { key: 'csr', name: "Central Serous Retinopathy (CSR)" },
     { key: 'amd', name: "Macular Degeneration (AMD)" },
-    { key: 'c', name: "Cataract" },
     { key: 'm', name: "Pathological Myopia" },
     { key: 'hr', name: "Hypertensive Retinopathy" },
-    { key: 'dme', name: "Diabetic Macular Edema" },
+    { key: 'ravo', name: "Retinal Artery & Vein Occlusion" },
     { key: 'p', name: "Papilledema" },
-    { key: 'csr', name: "Serous Chorioretinopathy" },
-    { key: 'rvo', name: "Retinal Vein Occlusion" }
+    { key: 'rd', name: "Retinal Detachment" }
   ];
 
   return (
@@ -240,11 +245,19 @@ export default function AnalysisClient() {
               <div className="p-6 rounded-xl bg-card border border-border flex flex-col items-center justify-center relative overflow-hidden">
                 <div className={`absolute top-0 right-0 w-24 h-24 blur-3xl opacity-20`} style={{ backgroundColor: rhiMeta.color }} />
                 <span className="text-xs text-muted-foreground uppercase font-mono tracking-wider mb-2">Retinal Health Index</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-4xl font-extrabold text-white">{details.results.rhi}</span>
-                  <span className="text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: `${rhiMeta.color}20`, color: rhiMeta.color }}>
-                    {rhiMeta.label}
-                  </span>
+                <div className="flex flex-col items-center gap-1">
+                  <div className="flex items-center gap-3">
+                    <span className="text-4xl font-extrabold text-white">{details.results.rhi}</span>
+                    <span className="text-xs font-bold px-2 py-1 rounded" style={{ backgroundColor: `${rhiMeta.color}20`, color: rhiMeta.color }}>
+                      {rhiMeta.label}
+                    </span>
+                  </div>
+                  {details.previous_screening && (
+                    <div className={`text-[10px] font-bold tracking-wider mt-1 flex items-center gap-1 ${details.results.rhi < details.previous_screening.results.rhi ? 'text-red-400' : details.results.rhi > details.previous_screening.results.rhi ? 'text-green-400' : 'text-slate-400'}`}>
+                      {details.results.rhi < details.previous_screening.results.rhi ? '▼' : details.results.rhi > details.previous_screening.results.rhi ? '▲' : '■'}
+                      PREVIOUS: {details.previous_screening.results.rhi}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -265,6 +278,7 @@ export default function AnalysisClient() {
                           <th className="py-3 px-4 font-medium">Disease</th>
                           <th className="py-3 px-4 font-medium text-center">AI Image Score</th>
                           <th className="py-3 px-4 font-medium text-center text-secondary">Final Clinical Risk</th>
+                          <th className="py-3 px-4 font-medium text-center">Trend</th>
                           <th className="py-3 px-4 font-medium text-center">Severity/Status</th>
                         </tr>
                       </thead>
@@ -272,8 +286,6 @@ export default function AnalysisClient() {
                         {diseaseMap.map(({ key, name }) => {
                           const aiScore = details.results[key as keyof typeof details.results] as number;
                           const clinScore = details.results[`clinical_${key}` as keyof typeof details.results] as number;
-                          
-                          if (aiScore < 5 && clinScore < 5) return null; // Hide extremely low risk items to save space
                           
                           let statusColor = "text-slate-400 bg-slate-900";
                           let statusLabel = "Low Risk";
@@ -288,6 +300,19 @@ export default function AnalysisClient() {
                           const isExpanded = expandedRow === key;
                           const tests = confirmationTestsMapping[key] || [];
                           const confidence = getConfidenceLabel(key, clinScore);
+                          
+                          let trendElement = <span className="text-slate-500">-</span>;
+                          if (details.previous_screening) {
+                            const prevScore = details.previous_screening.results[key as keyof typeof details.previous_screening.results] as number;
+                            const diff = clinScore - prevScore;
+                            if (diff > 5) {
+                              trendElement = <span className="text-red-400 flex items-center justify-center gap-1 text-xs font-bold"><Activity size={12}/> +{diff.toFixed(1)}%</span>;
+                            } else if (diff < -5) {
+                              trendElement = <span className="text-green-400 flex items-center justify-center gap-1 text-xs font-bold"><ArrowLeft size={12} className="-rotate-45"/> {diff.toFixed(1)}%</span>;
+                            } else {
+                              trendElement = <span className="text-slate-400 text-xs font-bold">Stable</span>;
+                            }
+                          }
 
                           return (
                             <React.Fragment key={key}>
@@ -300,12 +325,15 @@ export default function AnalysisClient() {
                                   {name}
                                 </td>
                                 <td className="py-3 px-4 text-center">
-                                  <span className="text-slate-300 font-mono text-sm">{aiScore}%</span>
+                                  <span className="text-slate-300 font-mono text-sm">{aiScore.toFixed(1)}%</span>
                                 </td>
                                 <td className="py-3 px-4 text-center">
                                   <span className={`font-mono text-base font-bold ${clinScore >= 60 ? 'text-red-400' : clinScore >= 30 ? 'text-amber-400' : 'text-green-400'}`}>
-                                    {clinScore}%
+                                    {clinScore.toFixed(1)}%
                                   </span>
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  {trendElement}
                                 </td>
                                 <td className="py-3 px-4 text-center">
                                   <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${statusColor}`}>

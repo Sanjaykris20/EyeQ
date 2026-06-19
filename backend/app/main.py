@@ -18,7 +18,7 @@ app = FastAPI(
 # CORS configurations for frontend Next.js communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, lock down to the frontend domain URL
+    allow_origins=["http://localhost:3000"], # Fix CORS error with allow_credentials
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,3 +52,5 @@ def system_root():
         "version": settings.VERSION,
         "docs": "/docs"
     }
+
+# Reload trigger

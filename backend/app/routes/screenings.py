@@ -3,13 +3,13 @@ import uuid
 import shutil
 import json
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form, status
 from sqlmodel import Session, select
 from app.database import get_session
 from app.models import Screening, Result, Patient, User, ScreeningReviewUpdate
 from app.config import settings
 from app.auth import get_current_user
-from app.ai.analyzer import run_retinal_analysis
+from app.ai.analyzer import run_retinal_analysis_fast, run_gradcam_and_update
 from app.ai.fusion_engine import calculate_clinical_risk, get_all_verifications, get_targeted_questions_and_tests
 from app.ai.assistant import generate_medical_response
 
@@ -17,14 +17,15 @@ router = APIRouter(prefix="/screenings", tags=["Retinal Screenings"])
 
 @router.post("/pre-screen", status_code=status.HTTP_201_CREATED)
 async def pre_screen_scan(
+    background_tasks: BackgroundTasks,
     patient_id: str = Form(...),
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Stage 1: Uploads a fundus photograph and runs PyTorch analysis.
-    Returns AI scores and dynamically determines which symptoms and tests to ask next.
+    Stage 1: Uploads a fundus photograph and runs PyTorch forward pass only (fast).
+    Returns AI scores immediately. GradCAM heatmap is generated async in the background.
     """
     patient = session.get(Patient, patient_id)
     if not patient:
@@ -45,7 +46,8 @@ async def pre_screen_scan(
         raise HTTPException(status_code=500, detail=f"Failed to save scan: {e}")
 
     try:
-        analysis = run_retinal_analysis(raw_path, settings.UPLOAD_DIR)
+        # Fast path: preprocessing + forward pass only (no slow GradCAM backward pass)
+        analysis = run_retinal_analysis_fast(raw_path, settings.UPLOAD_DIR)
     except Exception as e:
         if os.path.exists(raw_path):
             os.remove(raw_path)
@@ -56,7 +58,8 @@ async def pre_screen_scan(
 
     image_url = f"/static/uploads/{raw_filename}"
     enhanced_image_url = f"/static/uploads/{analysis['enhanced_filename']}"
-    heatmap_image_url = f"/static/uploads/{analysis['heatmap_filename']}"
+    heatmap_filename = f"heatmap_{analysis['file_id']}.png"
+    heatmap_image_url = f"/static/uploads/{heatmap_filename}"
 
     screening = Screening(
         id=screening_id,
@@ -89,7 +92,18 @@ async def pre_screen_scan(
     session.add(screening)
     session.add(result)
     session.commit()
-    
+
+    # Schedule GradCAM heatmap generation asynchronously after response is sent
+    background_tasks.add_task(
+        run_gradcam_and_update,
+        raw_path=raw_path,
+        img_tensor=analysis["img_tensor"],
+        img_orig=analysis["img_orig"],
+        ai_scores=ai_scores,
+        heatmap_path=os.path.join(settings.UPLOAD_DIR, heatmap_filename),
+        screening_id=screening_id,
+    )
+
     return {
         "screening_id": screening_id,
         "ai_scores": ai_scores,

@@ -13,7 +13,7 @@ FIREBASE_DATABASE_URL = os.getenv(
 ).rstrip("/")
 
 # Global flag to disable sync events during initial sync pull to prevent circular loops
-SYNC_ENABLED = True
+SYNC_ENABLED = not settings.BYPASS_FIREBASE_AUTH
 
 # Try to initialize or access Firebase Admin SDK
 firebase_initialized = False

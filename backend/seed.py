@@ -167,15 +167,13 @@ def seed_database():
             id="res_sterling_old",
             screening_id=scr_id0,
             dr=48.2,
-            g=10.5,
             amd=3.8,
-            c=12.0,
             m=2.0,
             hr=55.0,
-            dme=51.2,
             p=5.0,
             csr=12.0,
-            rvo=18.0,
+            ravo=18.0,
+            rd=12.0,
             rhi=62 # Moderate Risk Gauge
         )
         session.add(scr0)
@@ -204,15 +202,13 @@ def seed_database():
             id="res_sterling",
             screening_id=scr_id1,
             dr=86.5,
-            g=12.1,
             amd=4.2,
-            c=15.0,
             m=2.3,
             hr=78.2,
-            dme=82.4,
             p=6.8,
             csr=14.5,
-            rvo=22.1,
+            ravo=22.1,
+            rd=15.0,
             rhi=38 # High Risk Gauge
         )
         session.add(scr1)
@@ -241,15 +237,13 @@ def seed_database():
             id="res_jenkins",
             screening_id=scr_id2,
             dr=8.2,
-            g=69.4,
             amd=25.8,
-            c=38.1,
             m=10.5,
             hr=15.0,
-            dme=4.1,
             p=11.2,
             csr=6.4,
-            rvo=7.9,
+            ravo=7.9,
+            rd=38.1,
             rhi=64 # Moderate Risk Gauge
         )
         session.add(scr2)
@@ -278,15 +272,13 @@ def seed_database():
             id="res_rostova",
             screening_id=scr_id3,
             dr=2.4,
-            g=3.8,
             amd=1.1,
-            c=4.5,
             m=3.0,
             hr=2.1,
-            dme=1.0,
             p=1.8,
             csr=1.5,
-            rvo=0.9,
+            ravo=0.9,
+            rd=4.5,
             rhi=96 # Excellent Health Gauge
         )
         session.add(scr3)

@@ -212,15 +212,14 @@ def generate_pdf_report(screening: Screening, result: Result, output_path: str):
     # We sort diseases by highest probability
     all_scores = [
         ("Diabetic Retinopathy (DR)", result.dr),
-        ("Glaucoma", result.g),
+        ("Central Serous Chorioretinopathy (CSR)", result.csr),
         ("Age-related Macular Degeneration (AMD)", result.amd),
-        ("Cataract", result.c),
         ("Pathological Myopia", result.m),
         ("Hypertensive Retinopathy (HR)", result.hr),
-        ("Diabetic Macular Edema (DME)", result.dme),
+        ("Retinal Artery & Vein Occlusion (RA/VO)", result.rvo),
         ("Papilledema", result.p),
-        ("Central Serous Chorioretinopathy (CSR)", result.csr),
-        ("Retinal Vein Occlusion (RVO)", result.rvo),
+        ("Retinal Detachment", result.rd),
+        ("Diabetic Retinopathy (DR)", result.dr),
     ]
     all_scores.sort(key=lambda x: x[1], reverse=True)
 
@@ -426,15 +425,13 @@ async def analyze_test_report(
     
     disease_keywords = {
         "DR": ["diabetic retinopathy", "microaneurysm", "cotton wool spots", "neovascularization", "hard exudates"],
-        "Glaucoma": ["glaucoma", "cup-to-disc ratio", "optic nerve cupping", "elevated iop", "intraocular pressure"],
+        "CSR": ["central serous chorioretinopathy", "subretinal fluid", "csr"],
         "AMD": ["macular degeneration", "drusen", "choroidal neovascularization", "amd"],
-        "Cataract": ["cataract", "lens opacity", "cloudy lens", "phacoemulsification"],
         "Myopia": ["myopia", "pathological myopia", "high myopia", "axial length elongation"],
         "HR": ["hypertensive retinopathy", "av nicking", "arteriovenous nicking", "silver wiring"],
-        "DME": ["macular edema", "dme", "macular thickening"],
+        "RVO": ["retinal artery occlusion", "retinal vein occlusion", "rvo", "blood and thunder", "flame hemorrhages"],
         "Papilledema": ["papilledema", "optic disc swelling", "blurred margins", "intracranial pressure"],
-        "CSR": ["central serous chorioretinopathy", "subretinal fluid", "csr"],
-        "RVO": ["retinal vein occlusion", "rvo", "blood and thunder", "flame hemorrhages"]
+        "RD": ["retinal detachment", "retinal tear", "rhegmatogenous detachment"]
     }
     
     probabilities = {}

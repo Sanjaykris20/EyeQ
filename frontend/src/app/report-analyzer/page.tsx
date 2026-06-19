@@ -34,7 +34,8 @@ export default function ReportAnalyzerPage() {
     formData.append("file", file);
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/reports/analyze", {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+      const response = await fetch(`${API_BASE_URL}/reports/analyze`, {
         method: "POST",
         // Do not set Content-Type header, let the browser set it with the boundary for FormData
         headers: {

@@ -2,20 +2,18 @@ import json
 from typing import Dict, Any, List
 
 # Disease list matching analyzer
-DISEASES = ["DR", "Glaucoma", "AMD", "Cataract", "Myopia", "HR", "DME", "Papilledema", "CSR", "RVO"]
+DISEASES = ["DR", "CSR", "AMD", "Myopia", "HR", "RAVO", "Papilledema", "RD"]
 
 # Recommended test mapping based on final clinical risk
 RECOMMENDED_TESTS_MAP = {
     "DR": ["HbA1c", "Fasting Blood Glucose", "Dilated Fundus Examination", "OCT"],
-    "Glaucoma": ["Tonometry", "OCT", "Visual Field Test"],
+    "CSR": ["OCT", "Fluorescein Angiography"],
     "AMD": ["OCT", "Amsler Grid Test", "Fluorescein Angiography"],
-    "Cataract": ["Slit Lamp Examination", "Visual Acuity Test"],
     "Myopia": ["Refraction Test", "Axial Length Measurement"],
     "HR": ["Blood Pressure Monitoring", "Cardiovascular Evaluation"],
-    "DME": ["OCT", "Fluorescein Angiography"],
+    "RAVO": ["Carotid Ultrasound", "Echocardiogram", "Fluorescein Angiography", "CBC"],
     "Papilledema": ["MRI Brain", "CT Scan", "Lumbar Puncture", "Neurological Evaluation"],
-    "CSR": ["OCT", "Fluorescein Angiography"],
-    "RVO": ["CBC", "Lipid Profile", "OCT", "Fluorescein Angiography"]
+    "RD": ["Dilated Fundus Examination", "Ultrasound", "OCT"]
 }
 
 def parse_int_safe(val, default=0):
@@ -58,33 +56,33 @@ def calculate_clinical_risk(ai_scores: Dict[str, float], patient_data: Dict[str,
     
     if age > 50:
         c_scores["AMD"] += 15
-        c_scores["Cataract"] += 15
-        c_scores["Glaucoma"] += 10
+        c_scores["RD"] += 15
+        c_scores["RD"] += 10
     if age < 30:
         c_scores["Myopia"] += 20
 
     if has_diabetes:
         c_scores["DR"] += 25
-        c_scores["DME"] += 20
-        c_scores["RVO"] += 10
-        c_scores["Cataract"] += 5
+        c_scores["RAVO"] += 20
+        c_scores["RAVO"] += 10
+        c_scores["RD"] += 5
         
     if has_htn:
         c_scores["HR"] += 25
-        c_scores["RVO"] += 15
-        c_scores["Glaucoma"] += 5
+        c_scores["RAVO"] += 15
+        c_scores["RD"] += 5
 
     if has_cholesterol:
-        c_scores["RVO"] += 15
+        c_scores["RAVO"] += 15
         c_scores["AMD"] += 5
         
     if med_hist.get("steroid_use") == "Yes":
         c_scores["CSR"] += 15
-        c_scores["Glaucoma"] += 10
+        c_scores["RD"] += 10
 
     # --- 2. Family History (Max ~15 points) ---
     if fam_hist.get("glaucoma") == "Yes":
-        c_scores["Glaucoma"] += 20
+        c_scores["RD"] += 20
     if fam_hist.get("amd") == "Yes":
         c_scores["AMD"] += 15
     if fam_hist.get("diabetes") == "Yes":
@@ -94,7 +92,7 @@ def calculate_clinical_risk(ai_scores: Dict[str, float], patient_data: Dict[str,
     smoking = lifestyle.get("smoking", "Never Smoked")
     if smoking in ["Current Smoker", "Yes"]:
         c_scores["AMD"] += 15
-        c_scores["RVO"] += 10
+        c_scores["RAVO"] += 10
         c_scores["CSR"] += 5
         
     stress = lifestyle.get("stress_level", "Low")
@@ -109,17 +107,17 @@ def calculate_clinical_risk(ai_scores: Dict[str, float], patient_data: Dict[str,
     if symptoms.get("blurred_vision") == "Yes":
         c_scores["DR"] += 10
         c_scores["AMD"] += 5
-        c_scores["DME"] += 10
-        c_scores["Cataract"] += 10
+        c_scores["RAVO"] += 10
+        c_scores["RD"] += 10
         c_scores["CSR"] += 5
         
     if symptoms.get("sudden_vision_loss") == "Yes":
-        c_scores["RVO"] += 25
+        c_scores["RAVO"] += 25
         c_scores["Papilledema"] += 15
         
     if symptoms.get("floaters") == "Yes":
         c_scores["DR"] += 15
-        c_scores["RVO"] += 10
+        c_scores["RAVO"] += 10
         
     if symptoms.get("distorted_vision") == "Yes":
         c_scores["AMD"] += 20
@@ -129,36 +127,36 @@ def calculate_clinical_risk(ai_scores: Dict[str, float], patient_data: Dict[str,
         c_scores["Myopia"] += 25
         
     if symptoms.get("loss_side_vision") == "Yes":
-        c_scores["Glaucoma"] += 25
+        c_scores["RD"] += 25
         
     if symptoms.get("double_vision") == "Yes":
         c_scores["Papilledema"] += 15
         
     if symptoms.get("eye_pain") == "Yes":
-        c_scores["Glaucoma"] += 15
+        c_scores["RD"] += 15
         
     if symptoms.get("light_sensitivity") == "Yes":
-        c_scores["Cataract"] += 15
+        c_scores["RD"] += 15
         
     if symptoms.get("night_vision_difficulty") == "Yes":
-        c_scores["Cataract"] += 15
+        c_scores["RD"] += 15
         c_scores["AMD"] += 10
         
     if symptoms.get("halos_around_lights") == "Yes":
-        c_scores["Glaucoma"] += 15
-        c_scores["Cataract"] += 10
+        c_scores["RD"] += 15
+        c_scores["RD"] += 10
         
     if symptoms.get("color_vision_faded") == "Yes":
         c_scores["AMD"] += 15
-        c_scores["Cataract"] += 10
+        c_scores["RD"] += 10
         
     if symptoms.get("central_vision_loss") == "Yes":
         c_scores["AMD"] += 25
-        c_scores["DME"] += 15
+        c_scores["RAVO"] += 15
         c_scores["CSR"] += 15
         
     if symptoms.get("photopsia_flashes") == "Yes":
-        c_scores["RVO"] += 15
+        c_scores["RAVO"] += 15
         c_scores["DR"] += 10
         
     # Neurological symptoms for Papilledema
@@ -179,26 +177,26 @@ def calculate_clinical_risk(ai_scores: Dict[str, float], patient_data: Dict[str,
     dia_bp = parse_int_safe(measurements.get("diastolic_bp"), 80)
     if sys_bp >= 140 or dia_bp >= 90:
         c_scores["HR"] += 20
-        c_scores["RVO"] += 10
+        c_scores["RAVO"] += 10
     if sys_bp >= 160 or dia_bp >= 100:
         c_scores["HR"] += 15
         
     hba1c = parse_float_safe(measurements.get("hba1c"), 5.0)
     if hba1c >= 6.5:
         c_scores["DR"] += 20
-        c_scores["DME"] += 15
+        c_scores["RAVO"] += 15
     if hba1c >= 8.0:
         c_scores["DR"] += 15
         
     fbs = parse_float_safe(measurements.get("fasting_blood_sugar"), 90.0)
     if fbs >= 126:
         c_scores["DR"] += 15
-        c_scores["DME"] += 10
+        c_scores["RAVO"] += 10
         
     iop_l = parse_float_safe(measurements.get("iop_left"), 15.0)
     iop_r = parse_float_safe(measurements.get("iop_right"), 15.0)
     if max(iop_l, iop_r) > 21:
-        c_scores["Glaucoma"] += 30
+        c_scores["RD"] += 30
 
     # Cap raw clinical scores at 100
     for d in DISEASES:
@@ -276,15 +274,13 @@ def verify_diagnosis(disease: str, risk_score: float, confirmation_tests: Dict[s
     # We can also support OR within a group (represented as tuples)
     requirements = {
         "DR": ["dilated_fundus_exam", ("hba1c_test", "fasting_blood_sugar_test")],
-        "DME": ["oct_scan"],
         "CSR": ["oct_scan", "fluorescein_angiography"],
         "AMD": ["oct_scan", "amsler_grid_test"],
-        "Glaucoma": ["tonometry", "oct_rnfl_scan", "visual_field_test"],
-        "Papilledema": ["brain_mri_ct_scan", "lumbar_puncture"],
-        "HR": ["blood_pressure_monitoring", ("carotid_doppler_ultrasound", "coagulation_profile")], # Hypertensive / Retinal Artery
-        "RVO": ["fluorescein_angiography", "oct_scan"],
         "Myopia": ["axial_length_measurement", "refraction_test"],
-        "Cataract": ["slit_lamp_exam", "visual_acuity_test"]
+        "HR": ["blood_pressure_monitoring", ("carotid_doppler_ultrasound", "coagulation_profile")],
+        "RAVO": ["fluorescein_angiography", "carotid_doppler_ultrasound", "oct_scan"],
+        "Papilledema": ["brain_mri_ct_scan", "lumbar_puncture"],
+        "RD": ["dilated_fundus_exam", "ultrasound_eye"]
     }
 
     # Human readable names of tests for UI messages
@@ -306,7 +302,8 @@ def verify_diagnosis(disease: str, risk_score: float, confirmation_tests: Dict[s
         "axial_length_measurement": "Axial Length Measurement",
         "refraction_test": "Refraction Test",
         "slit_lamp_exam": "Slit Lamp Exam",
-        "visual_acuity_test": "Visual Acuity Test"
+        "visual_acuity_test": "Visual Acuity Test",
+        "ultrasound_eye": "Eye Ultrasound (B-scan)"
     }
 
     req_tests = requirements.get(disease, [])
@@ -364,28 +361,24 @@ def get_targeted_questions_and_tests(ai_scores: Dict[str, float]) -> Dict[str, A
     
     disease_symptom_map = {
         "DR": ["blurred_vision", "floaters", "photopsia_flashes"],
-        "Glaucoma": ["loss_side_vision", "eye_pain", "halos_around_lights"],
+        "CSR": ["distorted_vision", "blurred_vision", "central_vision_loss"],
         "AMD": ["distorted_vision", "night_vision_difficulty", "blurred_vision", "color_vision_faded", "central_vision_loss"],
-        "Cataract": ["light_sensitivity", "night_vision_difficulty", "blurred_vision", "color_vision_faded", "halos_around_lights"],
         "Myopia": ["difficulty_distant"],
         "HR": [],
-        "DME": ["blurred_vision", "distorted_vision", "central_vision_loss"],
+        "RAVO": ["sudden_vision_loss", "floaters", "photopsia_flashes"],
         "Papilledema": ["sudden_vision_loss", "double_vision", "severe_headache", "vision_blackouts", "pulsatile_tinnitus"],
-        "CSR": ["distorted_vision", "blurred_vision", "central_vision_loss"],
-        "RVO": ["sudden_vision_loss", "floaters", "photopsia_flashes"]
+        "RD": ["photopsia_flashes", "floaters", "loss_side_vision", "sudden_vision_loss"]
     }
     
     disease_measurement_map = {
         "DR": ["hba1c", "fasting_blood_sugar"],
-        "Glaucoma": ["iop_left", "iop_right"],
+        "CSR": [],
         "AMD": ["visual_acuity"],
-        "Cataract": ["visual_acuity"],
         "Myopia": ["visual_acuity"],
         "HR": ["systolic_bp", "diastolic_bp"],
-        "DME": ["hba1c", "fasting_blood_sugar"],
+        "RAVO": ["systolic_bp", "diastolic_bp"],
         "Papilledema": ["systolic_bp", "diastolic_bp"],
-        "CSR": [],
-        "RVO": ["systolic_bp", "diastolic_bp"]
+        "RD": ["visual_acuity"]
     }
     
     for d in top_suspects:
